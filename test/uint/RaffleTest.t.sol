@@ -186,11 +186,16 @@ contract RaffleTest is Test {
         vm.roll(block.number + 1);
         _;
     }
-
+    modifier skipFork() {
+        if (block.chainid != 31337) {
+            return;
+        }
+        _;
+    }
     // This is Fuzz testing : and what actually it does is it will give random value to the function parameter. it depend upon the parameter : like we have already se the fuzz value to 1000
     function testRandomWordsAfterPerformUpkeep(
         uint256 value
-    ) public raffleEnterd {
+    ) public raffleEnterd skipFork {
         // Arrange  // Act // Assert
         vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
         VRFCoordinatorV2_5Mock(vrfCoordinator).fulfillRandomWords(
@@ -201,7 +206,7 @@ contract RaffleTest is Test {
 
     function testFullfillrandomWordsPicksAWinnerResetsAndSendsMoney()
         public
-        raffleEnterd
+        raffleEnterd skipFork
     {
         // Arrange
         uint256 startingIndex = 1;
@@ -216,20 +221,30 @@ contract RaffleTest is Test {
             raffle.enterRaffle{value: entranceFee}();
         }
 
+        
+
         // Act
         vm.recordLogs();
         raffle.performUpkeep("");
         Vm.Log[] memory entrie = vm.getRecordedLogs();
         bytes32 requestId = entrie[1].topics[1];
-        console2.log("Request Id is  : ",uint256(requestId));
+        console2.log("Request Id is  : ", uint256(requestId));
+        console2.log("Contract balance is  : ", address(raffle).balance);
+
         console2.log("User balance : ", USER.balance);
-        console2.log("user : ",raffle.getPlayer(0));
-        VRFCoordinatorV2_5Mock(vrfCoordinator).fulfillRandomWords(uint256(requestId), address(raffle));
+        console2.log("user : ", raffle.getPlayer(0));
+        
+        VRFCoordinatorV2_5Mock(vrfCoordinator).fulfillRandomWords(
+            uint256(requestId),
+            address(raffle)
+        );
 
         // Assert
+        address recentWinner = raffle.getRecentWinner();
+        console2.log("Recent winner is : ", recentWinner);
+        console2.log("Winner balance is : ", recentWinner.balance);
         Raffle.RaffleState raffleState = raffle.getRaffleState();
         assert(uint256(raffleState) == 0);
         console2.log("Raffle state is: ", uint256(raffleState));
-        
     }
 }
